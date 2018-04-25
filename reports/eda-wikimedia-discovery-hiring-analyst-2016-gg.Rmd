@@ -1,0 +1,189 @@
+---
+title: "Wikimedia-Discovery-Hiring-Analyst-2016"
+author: "Guilherme Gadelha"
+date: "April 24, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(lubridate)
+library(here)
+theme_set(theme_bw())
+
+searches = read_csv(here::here("data/search_data.csv"))
+
+```
+
+#### Variable: results
+```{r data_exploration_results}
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "Amount of Results", y = results)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "Amount of Results", y = results)) +
+  geom_point() +
+  geom_jitter() +
+  scale_y_log10()
+
+searches %>% na.omit() %>%
+  filter(results < 50) %>%
+  ggplot(aes(x = results)) +
+  geom_histogram(bins = 50)
+
+# searches %>% na.omit() %>%
+#   filter(results >= 25) %>% 
+#   ggplot(aes(x = results)) +
+#   geom_histogram(bins = 50)
+
+searches %>% na.omit() %>% 
+  summarise(mean = mean(results),
+            med = median(results),
+            sd = sd(results),
+            max = max(results))
+
+searches %>% filter(results == 0) %>% summarise(amount = n())
+```
+
+We can see that:
+* we have more than 25000 queries with the number of results equal to 0.
+* most of the queries return 20 results or more 
+
+#### Variable: search_index
+```{r data_exploration_search_index}
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "Amount of Queries per Session", y = search_index)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "Amount of Queries per Session", y = search_index)) +
+  geom_point(alpha = .4) +
+  geom_jitter() +
+  scale_y_log10()
+
+searches %>% na.omit() %>%
+  filter(search_index < 20) %>% 
+  ggplot(aes(x = search_index)) +
+  geom_histogram(bins = 50)
+
+searches %>% na.omit() %>%
+  filter(search_index >= 20) %>% 
+  ggplot(aes(x = search_index)) +
+  geom_histogram(bins = 50)
+
+searches %>% na.omit() %>% 
+  summarise(mean = mean(search_index),
+            med = median(search_index),
+            sd = sd(search_index),
+            max = max(search_index))
+```
+
+
+#### Variable: session_start_date
+```{r data_exploration_session_start_date}
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "Session Start Date", y = wday(session_start_date))) +
+  geom_boxplot()
+
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "Session Start Date", y = wday(session_start_date))) +
+  geom_point(alpha = .2) +
+  geom_jitter()
+
+searches %>% na.omit() %>%
+  ggplot(aes(x = wday(session_start_date))) +
+  geom_histogram(bins = 7)
+
+searches %>% na.omit() %>% 
+  summarise(mean = mean(wday(session_start_date)),
+            med = median(wday(session_start_date)),
+            sd = sd(wday(session_start_date)),
+            max = max(wday(session_start_date)))
+```
+
+#### Variable: group
+```{r data_exploration_group}
+searches %>%    
+  group_by(group) %>% 
+  tally()
+```
+
+
+#### Variable: first_click
+```{r data_exploration_first_click}
+searches %>% 
+  ggplot(aes(x = "First Click", y = first_click)) +
+  geom_point() +
+  geom_jitter(alpha = .4) +
+  scale_y_log10()
+
+searches %>% filter(is.na(first_click)) %>% summarise(am = n())
+
+searches %>% na.omit() %>% 
+  summarise(mean = mean(first_click),
+            med = median(first_click),
+            sd = sd(first_click),
+            max = max(first_click))
+
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "First Click", y = first_click)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+```
+
+
+
+```{r clean}
+
+
+```
+
+## What is our daily overall clickthrough rate? How does it vary between the groups?
+
+```{r}
+
+searches %>% ggplot(aes(x = day(session_start_date), y = num_clicks, fill=group)) +
+  geom_col() +
+  labs(x = "Week Day",
+       y = "Number of Clicks",
+       fill = "Group") +
+  facet_grid(~ group)
+```
+
+```{r summarize by day of week}
+
+searches %>% mutate(day_of_week = wday(session_start_date)) %>% 
+  group_by(day_of_week) %>% 
+  summarise(mean = mean(num_clicks),
+            sd = sd(num_clicks),
+            min = min(num_clicks),
+            max = max(num_clicks))
+```
+
+```{r}
+searches %>% mutate(day_of_week = wday(session_start_date)) %>% 
+  group_by(day_of_week) %>% 
+  ggplot(aes(x=num_clicks, y = day_of_week)) +
+  geom_point(aes(col = day_of_week)) 
+```
+
+```{r}
+
+searches %>% 
+  ggplot(aes(x=gtzero)) +
+  geom_histogram() +
+  facet_grid(~ group)
+
+```
+
+```{r}
+searches %>% 
+    ggplot(aes(x = "", y = num_clicks)) + 
+    geom_jitter(alpha = .4, width = .2, size = .8)
+```
+
