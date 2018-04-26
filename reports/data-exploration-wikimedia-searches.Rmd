@@ -1,0 +1,176 @@
+---
+title: "data-exploration-wikimedia-searches"
+author: "Guilherme Gadelha"
+date: "April 26, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(lubridate)
+library(here)
+theme_set(theme_bw())
+
+searches = read_csv(here::here("data/search_data.csv"))
+
+```
+
+#### Variable: session_id
+```{r data_exploration_session_id}
+searches %>% 
+  distinct(session_id) %>% 
+  summarise(amount_unique_sessions = n())
+
+searches %>% 
+  summarize(amount_sessions = n())
+```
+
+#### Variable: results
+```{r data_exploration_results}
+searches %>% 
+  ggplot(aes(x = "Amount of Results", y = results)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+searches %>% 
+  ggplot(aes(x = "Amount of Results", y = results)) +
+  geom_point() +
+  geom_jitter() +
+  scale_y_log10()
+
+searches %>% na.omit() %>%
+  filter(results < 50) %>%
+  ggplot(aes(x = results)) +
+  geom_histogram(bins = 50)
+
+# searches %>% na.omit() %>%
+#   filter(results >= 25) %>% 
+#   ggplot(aes(x = results)) +
+#   geom_histogram(bins = 50)
+
+searches %>% 
+  summarise(mean = mean(results),
+            med = median(results),
+            sd = sd(results),
+            max = max(results))
+
+searches %>% filter(results == 0) %>% summarise(amount = n())
+```
+
+We can see that:
+* we have more than 25000 queries with the number of results equal to 0.
+* most of the queries return 20 results (default value)
+
+#### Variable: search_index
+```{r data_exploration_search_index}
+searches %>% 
+  ggplot(aes(x = "search index", y = search_index)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+searches %>% 
+  ggplot(aes(x = "search index", y = search_index)) +
+  geom_point(alpha = .4) +
+  geom_jitter() +
+  scale_y_log10()
+
+searches %>% na.omit() %>%
+  filter(search_index < 20) %>% 
+  ggplot(aes(x = search_index)) +
+  labs(x = "search_index < 20") +
+  geom_histogram(bins = 50)
+
+searches %>% na.omit() %>%
+  filter(search_index >= 20) %>% 
+  ggplot(aes(x = search_index)) +
+  labs(x = "search_index >= 20") +
+  geom_histogram(bins = 50)
+
+searches %>% 
+  summarise(mean = mean(search_index),
+            med = median(search_index),
+            sd = sd(search_index),
+            max = max(search_index))
+```
+
+
+#### Variable: session_start_date
+```{r data_exploration_session_start_date}
+searches %>% 
+  ggplot(aes(x = "Session Start Date", y = round_date(session_start_date, unit="day"))) +
+  geom_boxplot()
+
+searches %>% 
+  ggplot(aes(x = "Session Start Date", y = round_date(session_start_date, unit="day"))) +
+  geom_point(alpha = .2) +
+  geom_jitter()
+
+searches %>% 
+  ggplot(aes(x = round_date(session_start_date, unit="day"))) +
+  geom_histogram()
+
+searches %>% 
+  summarise(mean = mean(round_date(session_start_date, unit="day")),
+            med = median(round_date(session_start_date, unit="day")),
+            sd = sd(round_date(session_start_date, unit="day")),
+            max = max(round_date(session_start_date, unit="day")))
+```
+
+#### Variable: group
+```{r data_exploration_group}
+searches %>%    
+  group_by(group) %>% 
+  tally()
+```
+
+
+#### Variable: first_click
+```{r data_exploration_first_click}
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "First Click", y = first_click)) +
+  geom_point() +
+  geom_jitter(alpha = .4) +
+  scale_y_log10()
+
+searches %>% filter(is.na(first_click)) %>% summarise(am = n())
+
+searches %>% na.omit() %>% 
+  summarise(mean = mean(first_click),
+            med = median(first_click),
+            sd = sd(first_click),
+            max = max(first_click))
+
+searches %>% na.omit() %>% 
+  ggplot(aes(x = "First Click", y = first_click)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+```
+
+
+#### Variable: num_clicks
+```{r data_exploration_num_clicks}
+searches %>% 
+  ggplot(aes(x = "Number of Clicks", y = num_clicks)) +
+  geom_point() +
+  geom_jitter(alpha = .4) +
+  scale_y_log10()
+
+searches %>% filter(is.na(num_clicks)) %>% summarise(am = n())
+
+searches %>% 
+  summarise(mean = mean(num_clicks),
+            med = median(num_clicks),
+            sd = sd(num_clicks),
+            max = max(num_clicks))
+
+searches %>% ggplot(aes(num_clicks)) +
+  geom_histogram()
+
+searches %>%  
+  ggplot(aes(x = "Number of Clicks", y = num_clicks)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+```

@@ -16,174 +16,86 @@ searches = read_csv(here::here("data/search_data.csv"))
 
 ```
 
-#### Variable: results
-```{r data_exploration_results}
-searches %>% na.omit() %>% 
-  ggplot(aes(x = "Amount of Results", y = results)) +
-  geom_boxplot() +
-  scale_y_log10()
-
-searches %>% na.omit() %>% 
-  ggplot(aes(x = "Amount of Results", y = results)) +
-  geom_point() +
-  geom_jitter() +
-  scale_y_log10()
-
-searches %>% na.omit() %>%
-  filter(results < 50) %>%
-  ggplot(aes(x = results)) +
-  geom_histogram(bins = 50)
-
-# searches %>% na.omit() %>%
-#   filter(results >= 25) %>% 
-#   ggplot(aes(x = results)) +
-#   geom_histogram(bins = 50)
-
-searches %>% na.omit() %>% 
-  summarise(mean = mean(results),
-            med = median(results),
-            sd = sd(results),
-            max = max(results))
-
-searches %>% filter(results == 0) %>% summarise(amount = n())
-```
-
-We can see that:
-* we have more than 25000 queries with the number of results equal to 0.
-* most of the queries return 20 results or more 
-
-#### Variable: search_index
-```{r data_exploration_search_index}
-searches %>% na.omit() %>% 
-  ggplot(aes(x = "Amount of Queries per Session", y = search_index)) +
-  geom_boxplot() +
-  scale_y_log10()
-
-searches %>% na.omit() %>% 
-  ggplot(aes(x = "Amount of Queries per Session", y = search_index)) +
-  geom_point(alpha = .4) +
-  geom_jitter() +
-  scale_y_log10()
-
-searches %>% na.omit() %>%
-  filter(search_index < 20) %>% 
-  ggplot(aes(x = search_index)) +
-  geom_histogram(bins = 50)
-
-searches %>% na.omit() %>%
-  filter(search_index >= 20) %>% 
-  ggplot(aes(x = search_index)) +
-  geom_histogram(bins = 50)
-
-searches %>% na.omit() %>% 
-  summarise(mean = mean(search_index),
-            med = median(search_index),
-            sd = sd(search_index),
-            max = max(search_index))
-```
-
-
-#### Variable: session_start_date
-```{r data_exploration_session_start_date}
-searches %>% na.omit() %>% 
-  ggplot(aes(x = "Session Start Date", y = wday(session_start_date))) +
-  geom_boxplot()
-
-searches %>% na.omit() %>% 
-  ggplot(aes(x = "Session Start Date", y = wday(session_start_date))) +
-  geom_point(alpha = .2) +
-  geom_jitter()
-
-searches %>% na.omit() %>%
-  ggplot(aes(x = wday(session_start_date))) +
-  geom_histogram(bins = 7)
-
-searches %>% na.omit() %>% 
-  summarise(mean = mean(wday(session_start_date)),
-            med = median(wday(session_start_date)),
-            sd = sd(wday(session_start_date)),
-            max = max(wday(session_start_date)))
-```
-
-#### Variable: group
-```{r data_exploration_group}
-searches %>%    
-  group_by(group) %>% 
-  tally()
-```
-
-
-#### Variable: first_click
-```{r data_exploration_first_click}
-searches %>% 
-  ggplot(aes(x = "First Click", y = first_click)) +
-  geom_point() +
-  geom_jitter(alpha = .4) +
-  scale_y_log10()
-
-searches %>% filter(is.na(first_click)) %>% summarise(am = n())
-
-searches %>% na.omit() %>% 
-  summarise(mean = mean(first_click),
-            med = median(first_click),
-            sd = sd(first_click),
-            max = max(first_click))
-
-searches %>% na.omit() %>% 
-  ggplot(aes(x = "First Click", y = first_click)) +
-  geom_boxplot() +
-  scale_y_log10()
-
-```
-
-
-
+Cleaning data, filter distinct sessions by *session_id*. We are interested only on unique sessions, once we want to calculate the daily overrall clickthrough rate.
 ```{r clean}
-
-
+searches <- searches %>% distinct(session_id, .keep_all = TRUE)
 ```
 
 ## What is our daily overall clickthrough rate? How does it vary between the groups?
 
-```{r}
+```{r question_1}
 
-searches %>% ggplot(aes(x = day(session_start_date), y = num_clicks, fill=group)) +
+searches %>% 
+  ggplot(aes(x = round_date(session_start_date, unit="day"), y = num_clicks, fill = group)) +
   geom_col() +
-  labs(x = "Week Day",
+  labs(x = "Day",
        y = "Number of Clicks",
        fill = "Group") +
   facet_grid(~ group)
+
 ```
 
-```{r summarize by day of week}
-
-searches %>% mutate(day_of_week = wday(session_start_date)) %>% 
-  group_by(day_of_week) %>% 
-  summarise(mean = mean(num_clicks),
-            sd = sd(num_clicks),
-            min = min(num_clicks),
-            max = max(num_clicks))
-```
-
+Grouping distinct sessions by *day* and *group*.
 ```{r}
-searches %>% mutate(day_of_week = wday(session_start_date)) %>% 
-  group_by(day_of_week) %>% 
-  ggplot(aes(x=num_clicks, y = day_of_week)) +
-  geom_point(aes(col = day_of_week)) 
+
+amount_of_sessions <- searches %>% 
+  mutate(day = round_date(session_start_date, unit="day")) %>% 
+  count(day, group)
+
+colnames(amount_of_sessions) <- c("day", "group", "n_sessions")
+
+head(amount_of_sessions)
+
 ```
 
+Grouping and counting clicks by *day* and *group*.
 ```{r}
+amount_of_clicks <- searches %>% 
+  mutate(day = round_date(session_start_date, unit="day")) %>% 
+  group_by(day, group) %>% 
+  summarise(n_clicks = sum(num_clicks))
+
+colnames(amount_of_clicks) <- c("day", "group", "n_clicks")
+
+head(amount_of_clicks)
+
+```
+
+Calculate and plotting the daily click through rate
+```{r}
+final_df <- merge(amount_of_sessions, amount_of_clicks, by=c("day", "group"))
+
+click_through_rate_df <- final_df %>% 
+  group_by(day, group) %>% 
+  summarise(ctr = n_clicks/n_sessions)
+
+click_through_rate_df %>% 
+  ggplot(aes(x = day, y = ctr, color=group)) +
+  geom_point() +
+  geom_line() +
+  facet_grid(~ group) +
+  labs(x = "Day",
+       y = "Click Through Rate",
+       fill="Group")
+
+```
+
+The daily overrall clickthrough rate (DTR): _*the proportion of search sessions where the user clicked on one of the results displayed*_. 
+
+On the first three days the DTR is greather than or equal 0.7, that means around 70% of unique search sessions resulted in at least one click by the user with the intention of visiting a page listed on a SERP (search engine result page) returned to him after a search query.
+
+It is important to make an observation: a good search engine returns to the user the best result in the first position in the SERP, so he needs to click only once in the page and trigger an action of _visitPage_ only once. This observation 
+
+## Which results do people tend to try first? How does it change day-to-day?
+
+```{r question_2, eval=FALSE}
 
 searches %>% 
-  ggplot(aes(x=gtzero)) +
-  geom_histogram() +
-  facet_grid(~ group)
+  mutate(day = day(session_start_date)) %>% 
+  group_by(first_click) %>% 
+  ggplot(aes(x = day, y = first_click, fill=day)) +
+  geom_bar(stat="identity", position="dodge")
 
 ```
 
-```{r}
-searches %>% 
-    ggplot(aes(x = "", y = num_clicks)) + 
-    geom_jitter(alpha = .4, width = .2, size = .8)
-```
 
