@@ -5,6 +5,8 @@ date: "April 24, 2018"
 output: html_document
 ---
 
+## Setup
+
 ```{r setup, include=FALSE}
 
 library(tidyverse)
@@ -14,19 +16,40 @@ theme_set(theme_bw())
 
 searches = read_csv(here::here("data/search_data.csv"))
 
+head(searches)
+names(searches)
+
 ```
+
+To make this analysis we modified the original script that gets the data from wikimedia. The modifications are the following:
+
+1. Original data slice size: 100000 observations (logged events)
+2. Change of variable name from search_index to num_searches
+3. Change of variable name from session_start_timestamp to first_event_timestamp
+4. Change of variable name from session_start_date to first_event_date_time
+
+The changes were made for improve the clarity and fidelity to the original dataset.
+
+## Question 1
+### What is our daily overall clickthrough rate? How does it vary between the groups?
+
+### Clean Data
 
 Cleaning data, filter distinct sessions by *session_id*. We are interested only on unique sessions, once we want to calculate the daily overrall clickthrough rate.
-```{r clean}
-searches <- searches %>% distinct(session_id, .keep_all = TRUE)
+
+```{r clean_1}
+sessions <- searches %>%
+  distinct(session_id, .keep_all = TRUE) %>% 
+  mutate(day = round_date(first_event_date_time, unit="day"))
 ```
 
-## What is our daily overall clickthrough rate? How does it vary between the groups?
+We create another variable called *sessions* to record our dataset. This new dataset contains unique sessions (search sessions) and the *day* that each search event occurred.
+
 
 ```{r question_1}
 
-searches %>% 
-  ggplot(aes(x = round_date(session_start_date, unit="day"), y = num_clicks, fill = group)) +
+sessions %>% 
+  ggplot(aes(x = day, y = num_clicks, fill = group)) +
   geom_col() +
   labs(x = "Day",
        y = "Number of Clicks",
@@ -35,60 +58,75 @@ searches %>%
 
 ```
 
-Grouping distinct sessions by *day* and *group*.
+Grouping and counting distinct sessions by *day* and *group*.
 ```{r}
 
-amount_of_sessions <- searches %>% 
-  mutate(day = round_date(session_start_date, unit="day")) %>% 
-  count(day, group)
+sessions %>% 
+  group_by(day, group) %>% 
+  summarise(n_distinct_sessions = n()) %>% 
+  head()
+```
 
-colnames(amount_of_sessions) <- c("day", "group", "n_sessions")
-
-head(amount_of_sessions)
+Grouping and counting search sessions with clicks and with no clicks by *day* and *group*.
+```{r}
+sessions %>%
+  group_by(day, group) %>%  
+  summarise(no_click_session = sum(num_clicks == 0),
+            with_click_sessions = sum(num_clicks > 0),
+            total_distinct_sessions = n(),
+            amount_of_clicks = sum(num_clicks)) %>% 
+  head()
 
 ```
 
-Grouping and counting clicks by *day* and *group*.
+Calculating and plotting the daily clickthrough rate (DCR)
 ```{r}
-amount_of_clicks <- searches %>% 
-  mutate(day = round_date(session_start_date, unit="day")) %>% 
-  group_by(day, group) %>% 
-  summarise(n_clicks = sum(num_clicks))
+dcr_df <- sessions %>%
+  group_by(day, group) %>%  
+  summarise(no_click_session = sum(num_clicks == 0),
+            with_click_sessions = sum(num_clicks > 0),
+            total_distinct_sessions = n(),
+            amount_of_clicks = sum(num_clicks),
+            dcr = with_click_sessions/total_distinct_sessions)
 
-colnames(amount_of_clicks) <- c("day", "group", "n_clicks")
+dcr_df
 
-head(amount_of_clicks)
-
-```
-
-Calculate and plotting the daily click through rate
-```{r}
-final_df <- merge(amount_of_sessions, amount_of_clicks, by=c("day", "group"))
-
-click_through_rate_df <- final_df %>% 
-  group_by(day, group) %>% 
-  summarise(ctr = n_clicks/n_sessions)
-
-click_through_rate_df %>% 
-  ggplot(aes(x = day, y = ctr, color=group)) +
+dcr_df %>% 
+  ggplot(aes(x = day, y = dcr, color=group)) +
   geom_point() +
   geom_line() +
+  geom_hline(aes(yintercept = mean(dcr_df$dcr), linetype="Mean"), colour="red") +
   facet_grid(~ group) +
   labs(x = "Day",
-       y = "Click Through Rate",
-       fill="Group")
-
+       y = "Clickthrough Rate",
+       color="Group",
+       linetype="Line Type")
 ```
 
-The daily overrall clickthrough rate (DTR): _*the proportion of search sessions where the user clicked on one of the results displayed*_. 
+The daily overrall clickthrough rate (DCR): _*the proportion of search sessions where the user clicked on one of the results displayed*_. 
 
-On the first three days the DTR is greather than or equal 0.7, that means around 70% of unique search sessions resulted in at least one click by the user with the intention of visiting a page listed on a SERP (search engine result page) returned to him after a search query.
+For the group *a*, on the first four days the DCR is greather than or equal 0.40, that means around 40% of search sessions resulted in at least one click by the user with the intention of visiting a page listed on a SERP (search engine result page) returned to him after a search query.
 
-It is important to make an observation: a good search engine returns to the user the best result in the first position in the SERP, so he needs to click only once in the page and trigger an action of _visitPage_ only once. This observation 
+It is important to make an observation: a good search engine returns to the user the best result in the firsts positions in the SERP, so he needs to click only once in the page and trigger an action of _visitPage_, logged by the wikimedia servers. In the following days, the clickthrough rate decreases, but stay around 0.40.
 
-## Which results do people tend to try first? How does it change day-to-day?
+For the group *b*, the clickthrough rate is visibly smaller than the observed in the group *a*, arriving close to 0.2 on March 7th, the best day, but remaining bellow it in all the recorded days.
 
-```{r question_2, eval=FALSE}
+
+## Question 2
+### Which results do people tend to try first? How does it change day-to-day?
+
+### Clean Data
+
+Here we are interested in *visitPage* events that happened after a search. The *visitPage* events are recorded in the *num_clicks* variable and the *position* of the result clicked first in the SERP (search engine result page) is recorded in *first_click* variable.
+
+```{r clean_2}
+sessions <- searches %>%
+  mutate(day = round_date(first_event_date_time, unit="day")) %>% 
+  filter(num_clicks >= 1)
+```
+
+
+```{r question_2}
 
 searches %>% 
   mutate(day = day(session_start_date)) %>% 

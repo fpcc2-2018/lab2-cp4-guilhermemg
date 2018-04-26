@@ -13,17 +13,30 @@ library(here)
 theme_set(theme_bw())
 
 searches = read_csv(here::here("data/search_data.csv"))
-
 ```
 
 #### Variable: session_id
 ```{r data_exploration_session_id}
-searches %>% 
-  distinct(session_id) %>% 
-  summarise(amount_unique_sessions = n())
 
 searches %>% 
-  summarize(amount_sessions = n())
+  distinct(session_id) %>% 
+  summarise(n = n())
+searches %>% 
+  summarise(n = n())
+
+head(searches)
+
+searches %>% 
+  distinct(session_id, .keep_all = T) %>% 
+  group_by(day = round_date(first_event_date_time, unit="day"), group) %>% 
+  summarise(no_click_session = sum(num_clicks == 0),
+            with_click_sessions = sum(num_clicks > 0),
+            total_distinct_sessions = n(),
+            amount_of_clicks = sum(num_clicks))
+
+searches %>% 
+  summarize(total_amount_searches = n())
+
 ```
 
 #### Variable: results
@@ -62,59 +75,52 @@ We can see that:
 * we have more than 25000 queries with the number of results equal to 0.
 * most of the queries return 20 results (default value)
 
-#### Variable: search_index
-```{r data_exploration_search_index}
+#### Variable: num_searches
+```{r data_exploration_num_searches}
 searches %>% 
-  ggplot(aes(x = "search index", y = search_index)) +
+  ggplot(aes(x = "num searches", y = num_searches)) +
   geom_boxplot() +
   scale_y_log10()
 
 searches %>% 
-  ggplot(aes(x = "search index", y = search_index)) +
+  ggplot(aes(x = "num searches", y = num_searches)) +
   geom_point(alpha = .4) +
   geom_jitter() +
   scale_y_log10()
 
-searches %>% na.omit() %>%
-  filter(search_index < 20) %>% 
-  ggplot(aes(x = search_index)) +
-  labs(x = "search_index < 20") +
-  geom_histogram(bins = 50)
-
-searches %>% na.omit() %>%
-  filter(search_index >= 20) %>% 
-  ggplot(aes(x = search_index)) +
-  labs(x = "search_index >= 20") +
-  geom_histogram(bins = 50)
+searches %>%
+  ggplot(aes(x = num_searches)) +
+  geom_histogram() +
+  scale_y_log10()
 
 searches %>% 
-  summarise(mean = mean(search_index),
-            med = median(search_index),
-            sd = sd(search_index),
-            max = max(search_index))
+  summarise(mean = mean(num_searches),
+            med = median(num_searches),
+            sd = sd(num_searches),
+            max = max(num_searches))
 ```
 
 
-#### Variable: session_start_date
-```{r data_exploration_session_start_date}
+#### Variable: first_event_date_time
+```{r data_exploration_first_event_date_time}
 searches %>% 
-  ggplot(aes(x = "Session Start Date", y = round_date(session_start_date, unit="day"))) +
+  ggplot(aes(x = "First Event Day", y = round_date(first_event_date_time, unit="day"))) +
   geom_boxplot()
 
 searches %>% 
-  ggplot(aes(x = "Session Start Date", y = round_date(session_start_date, unit="day"))) +
+  ggplot(aes(x = "First Event Day", y = round_date(first_event_date_time, unit="day"))) +
   geom_point(alpha = .2) +
   geom_jitter()
 
 searches %>% 
-  ggplot(aes(x = round_date(session_start_date, unit="day"))) +
+  ggplot(aes(x = round_date(first_event_date_time, unit="day"))) +
   geom_histogram()
 
 searches %>% 
-  summarise(mean = mean(round_date(session_start_date, unit="day")),
-            med = median(round_date(session_start_date, unit="day")),
-            sd = sd(round_date(session_start_date, unit="day")),
-            max = max(round_date(session_start_date, unit="day")))
+  summarise(mean = mean(round_date(first_event_date_time, unit="day")),
+            med = median(round_date(first_event_date_time, unit="day")),
+            sd = sd(round_date(first_event_date_time, unit="day")),
+            max = max(round_date(first_event_date_time, unit="day")))
 ```
 
 #### Variable: group
