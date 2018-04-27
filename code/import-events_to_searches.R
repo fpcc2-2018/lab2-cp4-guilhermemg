@@ -6,7 +6,7 @@ message("Lendo dados brutos de eventos")
 
 events = read_csv(here::here("data/events_log.csv.gz"))
 
-events = events %>% slice(1:1e6) # Útil para testar código em dados pequenos. Comente na hora de processá-los para valer.
+# events = events %>% slice(1:4e5) # Útil para testar código em dados pequenos. Comente na hora de processá-los para valer.
 
 message("Transformando em dados por busca")
 
