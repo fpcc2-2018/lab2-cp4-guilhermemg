@@ -15,6 +15,12 @@ theme_set(theme_bw())
 searches = read_csv(here::here("data/search_data.csv"))
 ```
 
+```{r clean}
+searches <- searches %>% 
+  mutate(day = round_date(first_event_date_time, unit="day"))
+```
+
+
 #### Variable: session_id
 ```{r data_exploration_session_id}
 
@@ -27,8 +33,8 @@ searches %>%
 head(searches)
 
 searches %>% 
-  distinct(session_id, .keep_all = T) %>% 
-  group_by(day = round_date(first_event_date_time, unit="day"), group) %>% 
+  # distinct(session_id, .keep_all = T) %>% 
+  group_by(day, group) %>% 
   summarise(no_click_session = sum(num_clicks == 0),
             with_click_sessions = sum(num_clicks > 0),
             total_distinct_sessions = n(),

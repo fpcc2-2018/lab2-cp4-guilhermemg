@@ -41,72 +41,89 @@ The changes were made for improve the clarity and fidelity to the original datas
 
 ## [Clean Data](#clean1)
 
-Cleaning data, filter distinct sessions by *session_id*. We are interested only on unique sessions, once we want to calculate the daily overrall clickthrough rate.
+We are interested in to calculate the daily overrall clickthrough rate. However, we have two particular problems:
+
+1. In the same search session, the user can do multiple searches, so multiple search events are recorded associated with the same *session_id*.
+2. The logged days do not correspond to intervals of exactly 24h to all the nine days in the dataset, we
+need to balance the distribution of events over the days considering this fact.
+
+### [Method](#clean1Method)
+
+In order to clean and summarize the data we are dealing with, the following procedure was executed:
+
+1. a new variable *day* was created to record the day of the session;
+2. a grouping was made by session, day and group, summarizing the sum of clicks (*visitPage* events) by each row in the final dataset;
 
 ```{r clean_1}
 sessions <- searches %>%
-  distinct(session_id, .keep_all = TRUE) %>% 
-  mutate(day = round_date(first_event_date_time, unit="day"))
+  mutate(hour = round_date(first_event_date_time, unit="hour")) %>% 
+  group_by(session_id, hour, group) %>% 
+  summarize(n_clicks = sum(num_clicks),
+            n_sessions = n())
+
+sessions %>% head()
 ```
 
-We create another variable called *sessions* to record our dataset. This new dataset contains unique sessions (search sessions) and the *day* that each search event occurred.
+A special care with sessions that could last from one day to another was observed, so we checked if there was any repeated *session_id*, but there was any.
 
-
-```{r question_1}
+```{r}
+sessions %>% 
+  distinct(session_id, .keep_all = T) %>% 
+  dim()
 
 sessions %>% 
-  ggplot(aes(x = day, y = num_clicks, fill = group)) +
-  geom_col() +
-  labs(x = "Day",
-       y = "Number of Clicks",
-       fill = "Group") +
-  facet_grid(~ group)
-
+  dim()
 ```
 
-Grouping and counting distinct sessions by *day* and *group*.
+Grouping by session, we solve the first problem pointed out (same session with multiple searches in it).
+
+For solve the second problem, we need to identify the days that have an incomplete log spectrum, i.e., the ones do not catch data in a 24 hour period corresponding to that day.
+
 ```{r}
+n_sessions_df <- sessions %>% 
+  group_by(hour, group) %>% 
+  summarise(n_sessions = sum(n_sessions))
 
-sessions %>% 
-  group_by(day, group) %>% 
-  summarise(n_distinct_sessions = n()) %>% 
-  head()
+n_sessions_df %>% head()
+
+n_sessions_df %>% 
+  ggplot(aes(x = hour, y = n_sessions, color=group)) +
+  geom_line() +
+  geom_point() +
+  facet_grid(~ group) +
+  labs(x = "Hour",
+       y = "Number of Sessions",
+       colour = "Group")
 ```
 
-Grouping and counting search sessions with clicks and with no clicks by *day* and *group*.
+As we can see in the figure below, the last day has missing hours, then we will filter it from our dataset, so we can calculate the daily clickthrough rate without any missing data.
+
 ```{r}
-sessions %>%
-  group_by(day, group) %>%  
-  summarise(no_click_session = sum(num_clicks == 0),
-            with_click_sessions = sum(num_clicks > 0),
-            total_distinct_sessions = n(),
-            amount_of_clicks = sum(num_clicks)) %>% 
-  head()
+sessions <- sessions %>% 
+  filter(day(hour) != 8)
 
+sessions %>% dim()
 ```
+
 
 Calculating and plotting the daily clickthrough rate (DCR)
 ```{r}
-dcr_df <- sessions %>%
-  group_by(day, group) %>%  
-  summarise(no_click_session = sum(num_clicks == 0),
-            with_click_sessions = sum(num_clicks > 0),
-            total_distinct_sessions = n(),
-            amount_of_clicks = sum(num_clicks),
-            dcr = with_click_sessions/total_distinct_sessions)
+dcr_df <- sessions %>% 
+  group_by(hour, group) %>% 
+  summarise(dcr = sum(n_clicks)/sum(n_sessions))
 
-dcr_df
+dcr_df %>% head()
 
 dcr_df %>% 
-  ggplot(aes(x = day, y = dcr, color=group)) +
+  ggplot(aes(x = hour, y = dcr, color=group)) +
   geom_point() +
   geom_line() +
-  geom_hline(aes(yintercept = mean(dcr_df$dcr), linetype="Mean"), colour="red") +
+  # geom_hline(aes(yintercept = mean(dcr_df$dcr), linetype="Mean"), colour="red") +
   facet_grid(~ group) +
-  labs(x = "Day",
+  labs(x = "Hour",
        y = "Clickthrough Rate",
-       color="Group",
-       linetype="Line Type")
+       color="Group")
+       # linetype="Line Type")
 ```
 
 The daily overrall clickthrough rate (DCR): _*the proportion of search sessions where the user clicked on one of the results displayed*_. 
