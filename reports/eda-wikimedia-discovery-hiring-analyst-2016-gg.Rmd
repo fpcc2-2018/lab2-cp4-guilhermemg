@@ -108,19 +108,21 @@ sessions %>% dim()
 
 Calculating and plotting the daily clickthrough rate (DCR)
 ```{r}
+
 dcr_df <- sessions %>% 
-  group_by(hour, group) %>% 
+  mutate(day = day(hour)) %>%
+  group_by(day, group) %>%
   summarise(dcr = sum(n_clicks)/sum(n_sessions))
 
 dcr_df %>% head()
 
 dcr_df %>% 
-  ggplot(aes(x = hour, y = dcr, color=group)) +
+  ggplot(aes(x = day, y = dcr, color=group)) +
   geom_point() +
   geom_line() +
   # geom_hline(aes(yintercept = mean(dcr_df$dcr), linetype="Mean"), colour="red") +
   facet_grid(~ group) +
-  labs(x = "Hour",
+  labs(x = "Day",
        y = "Clickthrough Rate",
        color="Group")
        # linetype="Line Type")
@@ -130,9 +132,9 @@ The daily overrall clickthrough rate (DCR): _*the proportion of search sessions 
 
 For the group *a*, on the first four days the DCR is greather than or equal 0.40, that means around 40% of search sessions resulted in at least one click by the user with the intention of visiting a page listed on a SERP (search engine result page) returned to him after a search query.
 
-It is important to make an observation: a good search engine returns to the user the best result in the firsts positions in the SERP, so he needs to click only once in the page and trigger an action of _visitPage_, logged by the wikimedia servers. In the following days, the clickthrough rate decreases, but stay around 0.40.
+It is important to make an observation: a good search engine returns to the user the best result in the firsts positions in the SERP, so he needs to click only once in the page and trigger an action of _visitPage_, logged by the wikimedia servers. In the following days, the clickthrough rate decreases,  staying around 0.30.
 
-For the group *b*, the clickthrough rate is visibly smaller than the observed in the group *a*, arriving close to 0.2 on March 7th, the best day, but remaining bellow it in all the recorded days.
+For the group *b*, the clickthrough rate is visibly smaller than the observed in the group *a*, being below 0.2 for all the days in our sample.
 
 
 # [Question 2](#question2)
@@ -142,21 +144,74 @@ For the group *b*, the clickthrough rate is visibly smaller than the observed in
 
 Here we are interested in *visitPage* events that happened after a search. The *visitPage* events are recorded in the *num_clicks* variable and the *position* of the result clicked first in the SERP (search engine result page) is recorded in *first_click* variable.
 
+As identified on the previous sections, we have incomplete logged data for all the days, so we will exclude data from the last day (March 8th), so we can draw conclusions about the entire day and have some baseline to compare the days.
+
+It is of special interest to us to know in what result people first clicked, then we need to filter the events that have a number of clicks (*num_clicks*) greather than zero.
+
 ```{r clean_2}
-sessions <- searches %>%
-  mutate(day = round_date(first_event_date_time, unit="day")) %>% 
-  filter(num_clicks >= 1)
+searches <- searches %>%
+  mutate(day = day(first_event_date_time)) %>% 
+  filter(day != 8 & num_clicks >= 1 & first_click != 'NA')
 ```
 
+It is important observe too that we are no more interested on the data on a _session level_, but in a _search level_ now. 
 
-```{r question_2, eval=FALSE}
+Next we analyse how the position of first result clicked on the SERP vary by day and by group. To do that we check two metrics: the mean and median values to the *first click* variable.
 
+```{r}
+
+aux1 <- searches %>% 
+  group_by(day, group) %>%
+  summarise(mean_first_click = mean(first_click),
+            med_first_click = median(first_click))
+
+aux1 %>% 
+  ggplot(aes(x = day, y = mean_first_click)) +
+  geom_col() +
+  facet_grid(~group) +
+  labs(x = "Day",
+       y = "Mean First Click",
+       title="Mean of First Clicks By Day and Group")
+
+aux1 %>% 
+  ggplot(aes(x = day, y = med_first_click)) + 
+  geom_col() +
+  facet_grid(~group) +
+  labs(x = "Day",
+       y = "Median First Click",
+       title = "Median of First Click by Day and Group")
+```
+
+The visualizations show us that the extreme values highly influentiate the mean, we can see for the days 1 and 4 that the mean has very high if compared with others days.
+
+So we analyse the median as a more representative metric of evaluation, however, the second visualization show us that all days in both groups have median value of 1 and then we cannot make any other valuable conclusion.
+
+In face of this problem, we need to concentrate our attention on these extreme values, once they are influencing the analysis and we cannot get rid of them. So we analize the distribution of the first_click values:
+
+```{r}
 searches %>% 
-  mutate(day = day(session_start_date)) %>% 
-  group_by(first_click) %>% 
-  ggplot(aes(x = day, y = first_click, fill=day)) +
-  geom_bar(stat="identity", position="dodge")
-
+  filter(first_click > 0) %>% 
+  ggplot(aes(x = first_click)) +
+  geom_histogram() +
+  scale_y_log10() +
+  labs(title = "Histogram of First Click",
+       x = "First Click",
+       y = "Count")
 ```
 
+
+
+
+```{r}
+aux2 <- searches %>% 
+  group_by(day, group) %>%
+  summarise(max_first_click = max(first_click))
+
+aux2 %>%
+  ggplot(aes(x = day, y = max_first_click)) +
+  geom_col() +
+  facet_grid(~group) +
+  labs(x = "Day",
+       y = "Max First Click")
+```
 
