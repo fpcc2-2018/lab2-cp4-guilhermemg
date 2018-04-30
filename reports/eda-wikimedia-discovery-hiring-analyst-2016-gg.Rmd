@@ -27,6 +27,12 @@ names(searches)
 
 ```
 
+# [General Data Descrition](#generalDescription)
+```{r}
+searches %>% summary()
+```
+
+
 To make this analysis we modified the original script that gets the data from wikimedia. The modifications are the following:
 
 1. Original data slice size: 100000 observations (logged events)
@@ -39,13 +45,13 @@ The changes were made for improve the clarity and fidelity to the original datas
 # [Question 1](#question1)
 ####*What is our daily overall clickthrough rate? How does it vary between the groups?*
 
-## [Clean Data](#clean1)
+## [Cleaning Data](#clean1)
 
 We are interested in to calculate the daily overrall clickthrough rate. However, we have two particular problems:
 
 1. In the same search session, the user can do multiple searches, so multiple search events are recorded associated with the same *session_id*.
-2. The logged days do not correspond to intervals of exactly 24h to all the nine days in the dataset, we
-need to balance the distribution of events over the days considering this fact.
+2. The logged events do not correspond to intervals of exactly 24h to all the days in the dataset, we
+need to balance the distribution of events over the days considering this fact or exclude the day(s) with missing events in our analysis.
 
 ### [Method](#clean1Method)
 
@@ -54,7 +60,7 @@ In order to clean and summarize the data we are dealing with, the following proc
 1. a new variable *day* was created to record the day of the session;
 2. a grouping was made by session, day and group, summarizing the sum of clicks (*visitPage* events) by each row in the final dataset;
 
-```{r clean_1}
+```{r clean_11}
 sessions <- searches %>%
   mutate(hour = round_date(first_event_date_time, unit="hour")) %>% 
   group_by(session_id, hour, group) %>% 
@@ -66,7 +72,7 @@ sessions %>% head()
 
 A special care with sessions that could last from one day to another was observed, so we checked if there was any repeated *session_id*, but there was any.
 
-```{r}
+```{r clean_12}
 sessions %>% 
   distinct(session_id, .keep_all = T) %>% 
   dim()
@@ -79,7 +85,7 @@ Grouping by session, we solve the first problem pointed out (same session with m
 
 For solve the second problem, we need to identify the days that have an incomplete log spectrum, i.e., the ones do not catch data in a 24 hour period corresponding to that day.
 
-```{r}
+```{r clean_13}
 n_sessions_df <- sessions %>% 
   group_by(hour, group) %>% 
   summarise(n_sessions = sum(n_sessions))
@@ -98,16 +104,16 @@ n_sessions_df %>%
 
 As we can see in the figure below, the last day has missing hours, then we will filter it from our dataset, so we can calculate the daily clickthrough rate without any missing data.
 
-```{r}
+```{r clean_14}
 sessions <- sessions %>% 
   filter(day(hour) != 8)
 
 sessions %>% dim()
 ```
 
-
+## [Calculating](#calculating1)
 Calculating and plotting the daily clickthrough rate (DCR)
-```{r}
+```{r calc1}
 
 dcr_df <- sessions %>% 
   mutate(day = day(hour)) %>%
@@ -140,7 +146,7 @@ For the group *b*, the clickthrough rate is visibly smaller than the observed in
 # [Question 2](#question2)
 ####*Which results do people tend to try first? How does it change day-to-day?*
 
-## [Clean Data]({#clean2})
+## [Cleaning Data]({#clean2})
 
 Here we are interested in *visitPage* events that happened after a search. The *visitPage* events are recorded in the *num_clicks* variable and the *position* of the result clicked first in the SERP (search engine result page) is recorded in *first_click* variable.
 
@@ -148,19 +154,20 @@ As identified on the previous sections, we have incomplete logged data for all t
 
 It is of special interest to us to know in what result people first clicked, then we need to filter the events that have a number of clicks (*num_clicks*) greather than zero.
 
-```{r clean_2}
-searches <- searches %>%
+```{r clean_21}
+searches2 <- searches %>%
   mutate(day = day(first_event_date_time)) %>% 
-  filter(day != 8 & num_clicks >= 1 & first_click != 'NA')
+  filter(day != 8 & num_clicks >= 1 & first_click != 'NA' & first_click > 0)
 ```
 
 It is important observe too that we are no more interested on the data on a _session level_, but in a _search level_ now. 
 
 Next we analyse how the position of first result clicked on the SERP vary by day and by group. To do that we check two metrics: the mean and median values to the *first click* variable.
 
-```{r}
+## [Calculating](#calculating2)
+```{r calc_21}
 
-aux1 <- searches %>% 
+aux1 <- searches2 %>% 
   group_by(day, group) %>%
   summarise(mean_first_click = mean(first_click),
             med_first_click = median(first_click))
@@ -182,17 +189,17 @@ aux1 %>%
        title = "Median of First Click by Day and Group")
 ```
 
-The visualizations show us that the extreme values highly influentiate the mean, we can see for the days 1 and 4 that the mean has very high if compared with others days.
+The visualizations show us that the extreme values highly influentiate the mean, we can see for the days 1 and 4 of *group a* that the mean has very high if compared with others days.
 
 So we analyse the median as a more representative metric of evaluation, however, the second visualization show us that all days in both groups have median value of 1 and then we cannot make any other valuable conclusion.
 
 In face of this problem, we need to concentrate our attention on these extreme values, once they are influencing the analysis and we cannot get rid of them. So we analize the distribution of the first_click values:
 
-```{r}
-searches %>% 
+```{r calc_22}
+searches2 %>% 
   filter(first_click > 0) %>% 
   ggplot(aes(x = first_click)) +
-  geom_histogram() +
+  geom_histogram(binwidth = 80) +
   scale_y_log10() +
   labs(title = "Histogram of First Click",
        x = "First Click",
@@ -200,18 +207,53 @@ searches %>%
 ```
 
 
+Looking at the histogram of first click values, we see clearly it is right skewed and has many values concentrated aroud 1 click. Asserting the previous analysis with the mean and the median, however other values can be explored:
 
 
-```{r}
-aux2 <- searches %>% 
-  group_by(day, group) %>%
-  summarise(max_first_click = max(first_click))
-
-aux2 %>%
-  ggplot(aes(x = day, y = max_first_click)) +
-  geom_col() +
-  facet_grid(~group) +
-  labs(x = "Day",
-       y = "Max First Click")
+```{r calc_23}
+searches2 %>% 
+  mutate(first_click_group = ifelse(first_click == 1, "A (==1)", 
+                                    ifelse(first_click <= 5, "B (1< & <=5)",
+                                           ifelse(first_click <= 10, "C (>5 & <= 10)",
+                                                  ifelse(first_click < 20, "D (>10 & <= 20)",
+                                                         "E (>20)"))))) %>% 
+  group_by(group, day, first_click_group) %>% 
+  summarise(n_first_click_group = n()) %>% 
+  ggplot(aes(x = first_click_group, y = n_first_click_group)) +
+  geom_point(aes(color = group)) + 
+  facet_grid(day ~ .) +
+  labs(main = "Group of First Clicks (A-E) by Day (1-7)",
+         y = "Size of First Click Group",
+         x = "First Click Group",
+         color = "Dataset Group")
 ```
+
+The visualization allow us to see that the *group a* has a better performance for every analyzed day, considering that how many more first clicks better and how lower the position of the first click too. The groups A through E represents a position or set of positions the first click can assume, so, for example, to A (== 1), the first click is on first position and for B (1< & <= 5) the first click is between the second and fifth postions.
+
+
+# [Question 3](#question3)
+####*What is our daily overall zero results rate? How does it vary between the groups?*
+
+## [Cleaning Data]({#clean3})
+
+We are interested in to calculate the daily zero results rate (ZRR). The daily ZRR can be defined like that: the proportion of searches that yielded 0 results in a day-to-day interval.
+
+For this question we face a familiar problem:
+
+1. The logged events do not correspond to intervals of exactly 24h to all the days in the dataset, so we need to balance the distribution of events over the days considering this fact or exclude the day(s) with missing events in our analysis.
+
+### [Method](#cleanMethod3)
+
+In order to clean and summarize the data we are dealing with, the following procedure was executed:
+
+1. a new variable *day* was created to record the day of the session;
+2. we filtered the events of the eight day, that is incomplete;
+
+```{r clean3}
+searches3 <- searches %>% 
+  mutate(day = day(first_event_date_time)) %>% 
+  filter(day != 8)
+```
+
+
 

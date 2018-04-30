@@ -20,6 +20,10 @@ searches <- searches %>%
   mutate(day = round_date(first_event_date_time, unit="day"))
 ```
 
+```{r summary_dataset}
+searches %>% summary()
+```
+
 
 #### Variable: session_id
 ```{r data_exploration_session_id}
