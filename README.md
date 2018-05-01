@@ -1,3 +1,6 @@
+# RPubs 
+[Link para Publicação no RPubs](http://rpubs.com/guilhermemg/wikimedia-gg)
+
 # Seções, buscas e navegação na wikimedia
 
 Este repo é a semente para uma análise de padrões de busca e navegação em páginas de projetos da wikimedia (provavelmente wikipedia).
@@ -18,4 +21,4 @@ Como as análises propostas na tarefa original são em sua maioria sobre resulta
 
 ## Dependências
 
-R, com os pacotes `tidyverse`, `lubridate` e `here`.
+R, com os pacotes `tidyverse`, `lubridate`, `here` e `grid`.

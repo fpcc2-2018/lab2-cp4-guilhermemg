@@ -1,16 +1,25 @@
 ---
 title: "Wikimedia-Discovery-Hiring-Analyst-2016"
-author: "Guilherme Gadelha"
+author: "[Guilherme Gadelha](https://www.linkedin.com/in/guilhermegadelha/)"
 date: "April 24, 2018"
 output: 
   html_document:
     toc: true
     toc_depth: 3
-    toc_float: true
+    toc_float: 
+        collapsed: false
+        smooth_scroll: false
     df_print: kable
-    theme: united
+    theme: cerulean
     highlight: tango
 ---
+
+<style>
+body 
+{
+  text-align: justify
+}
+</style>
 
 # [Setup](#setup)
 
@@ -19,6 +28,7 @@ output:
 library(tidyverse)
 library(lubridate)
 library(here)
+library(grid)
 
 searches = read_csv(here::here("data/search_data.csv"))
 
@@ -27,18 +37,11 @@ names(searches)
 
 ```
 
-# [General Data Descrition](#generalDescription)
-```{r}
-searches %>% summary()
-```
-
-
 To make this analysis we modified the original script that gets the data from wikimedia. The modifications are the following:
 
-1. Original data slice size: 100000 observations (logged events)
-2. Change of variable name from search_index to num_searches
-3. Change of variable name from session_start_timestamp to first_event_timestamp
-4. Change of variable name from session_start_date to first_event_date_time
+1. Change of variable name from search_index to num_searches
+2. Change of variable name from session_start_timestamp to first_event_timestamp
+3. Change of variable name from session_start_date to first_event_date_time
 
 The changes were made for improve the clarity and fidelity to the original dataset.
 
@@ -57,8 +60,8 @@ need to balance the distribution of events over the days considering this fact o
 
 In order to clean and summarize the data we are dealing with, the following procedure was executed:
 
-1. a new variable *day* was created to record the day of the session;
-2. a grouping was made by session, day and group, summarizing the sum of clicks (*visitPage* events) by each row in the final dataset;
+1. a new variable *hour* was created to record the session starting hour;
+2. a grouping was made by session, hour and group, summarizing the sum of clicks (*visitPage* events) by each row in the final dataset;
 
 ```{r clean_11}
 sessions <- searches %>%
@@ -85,7 +88,7 @@ Grouping by session, we solve the first problem pointed out (same session with m
 
 For solve the second problem, we need to identify the days that have an incomplete log spectrum, i.e., the ones do not catch data in a 24 hour period corresponding to that day.
 
-```{r clean_13}
+```{r clean_13, fig.align='center'}
 n_sessions_df <- sessions %>% 
   group_by(hour, group) %>% 
   summarise(n_sessions = sum(n_sessions))
@@ -126,12 +129,9 @@ dcr_df %>%
   ggplot(aes(x = day, y = dcr, color=group)) +
   geom_point() +
   geom_line() +
-  # geom_hline(aes(yintercept = mean(dcr_df$dcr), linetype="Mean"), colour="red") +
-  facet_grid(~ group) +
   labs(x = "Day",
        y = "Clickthrough Rate",
        color="Group")
-       # linetype="Line Type")
 ```
 
 The daily overrall clickthrough rate (DCR): _*the proportion of search sessions where the user clicked on one of the results displayed*_. 
@@ -172,30 +172,35 @@ aux1 <- searches2 %>%
   summarise(mean_first_click = mean(first_click),
             med_first_click = median(first_click))
 
-aux1 %>% 
+g1 = aux1 %>% 
   ggplot(aes(x = day, y = mean_first_click)) +
   geom_col() +
   facet_grid(~group) +
   labs(x = "Day",
        y = "Mean First Click",
-       title="Mean of First Clicks By Day and Group")
+       title="Mean of First Clicks By Day and Group") +
+  ylim(0, 10)
 
-aux1 %>% 
+g2 = aux1 %>% 
   ggplot(aes(x = day, y = med_first_click)) + 
   geom_col() +
   facet_grid(~group) +
   labs(x = "Day",
        y = "Median First Click",
-       title = "Median of First Click by Day and Group")
+       title = "Median of First Click by Day and Group") +
+  ylim(0, 10)
+
+grid.newpage()
+grid.draw(rbind(ggplotGrob(g1), ggplotGrob(g2), size="last"))
 ```
 
-The visualizations show us that the extreme values highly influentiate the mean, we can see for the days 1 and 4 of *group a* that the mean has very high if compared with others days.
+The visualizations show us that the extreme values highly influentiate the mean, we can see for the days 1 and 4 of *group a* that the mean is very high if compared with the others days.
 
-So we analyse the median as a more representative metric of evaluation, however, the second visualization show us that all days in both groups have median value of 1 and then we cannot make any other valuable conclusion.
+So we analyse the median as a more representative metric of evaluation, however, the second visualization show us that all days in both groups have median value of 1 and then we cannot make any other valuable conclusion from it.
 
-In face of this problem, we need to concentrate our attention on these extreme values, once they are influencing the analysis and we cannot get rid of them. So we analize the distribution of the first_click values:
+In face of this problem, we need to concentrate our attention on the extreme values, once they are influencing the analysis and we cannot get rid of them. So we analyze the distribution of the *first_click* values:
 
-```{r calc_22}
+```{r calc_22, warning=FALSE, fig.align='center'}
 searches2 %>% 
   filter(first_click > 0) %>% 
   ggplot(aes(x = first_click)) +
@@ -207,10 +212,10 @@ searches2 %>%
 ```
 
 
-Looking at the histogram of first click values, we see clearly it is right skewed and has many values concentrated aroud 1 click. Asserting the previous analysis with the mean and the median, however other values can be explored:
+Looking at the histogram of first click values, we see clearly it is right skewed and has many values concentrated around 1 click, asserting the previous analysis with the mean and the median. However other values can be explored:
 
 
-```{r calc_23}
+```{r calc_23, fig.align='center'}
 searches2 %>% 
   mutate(first_click_group = ifelse(first_click == 1, "A (==1)", 
                                     ifelse(first_click <= 5, "B (1< & <=5)",
@@ -255,5 +260,114 @@ searches3 <- searches %>%
   filter(day != 8)
 ```
 
+
+## [Data Exploration](#eda3)
+
+Lets explore the variable *results* from our dataset that records the number of results returned in the search event. 
+
+```{r calc_31}
+g1 = searches3 %>% 
+  filter(results == 0) %>% 
+  group_by(day, group) %>% 
+  summarise(zero_results = n()) %>% 
+  ggplot(aes(x = day, y = zero_results, color=group)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Day",
+       y = "Amount of Zero Results",
+       color = "Group") +
+  ylim(0, 12000)
+
+g2 = searches3 %>% 
+  filter(results != 0) %>% 
+  group_by(day, group) %>% 
+  summarise(zero_results = n()) %>% 
+  ggplot(aes(x = day, y = zero_results, color=group)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Day",
+       y = "Amount of Non-Zero Results",
+       color = "Group") +
+  ylim(0, 12000)
+
+grid.newpage()
+grid.draw(rbind(ggplotGrob(g1), ggplotGrob(g2), size="last"))
+```
+
+The amount of zero results has a small variation over the analyzed days and for the analyzed groups. This does not happen with the non-zero results amount, that has a large variation and will determine the increase or decreasing of the daily zero results rate (ZRR).
+
+## [Calculation](#calc3)
+
+```{r calc_32}
+zrrs_df = searches3 %>% 
+  mutate(n_results_typegroup = ifelse(results > 0, ">0", "==0")) %>% 
+  group_by(day, group) %>% 
+  summarise(zero_results = sum(n_results_typegroup == "==0"),
+            not_zero_results = sum(n_results_typegroup == ">0"),
+            sum_results = zero_results + not_zero_results,
+            zrr = zero_results/sum_results * 100) 
+
+zrrs_df %>% head()
+```
+
+```{r calc_33}
+zrrs_df %>%   
+  ggplot(aes(x = day, y = zrr, color=group)) +
+  geom_point() +
+  geom_line() +
+  labs(title="Zero Results Rate by Day",
+       x = "Day",
+       y = "Zero Results Rate (%)",
+       color = "Group") +
+  ylim(0, 100)
+```
+
+It is very small the difference of the ZRR between the groups *a* and *b*, varying around 17% and 19% in the seven days of our dataset. The time and the group seems to have no relation to the zero results rate (ZRR).
+
+
+# [Question 4](#question4)
+####*Let session length be approximately the time between the first event and the last event in a session. Choose a variable from the dataset and describe its relationship to session length. Visualize the relationship.*
+
+## [Cleaning Data]({#clean4})
+
+The relationship that interest us here is the one may exist between *session_length* and *num_clicks* in a _search session_. Following the definition of *session_length*, some sessions end up having length zero once they have only one *visitPage* event associated with them. These ones will be filtered by us.
+
+```{r clean4}
+sessions <- searches %>%
+  group_by(session_id) %>% 
+  summarize(sum_num_clicks = sum(num_clicks),
+            session_length = max(first_event_timestamp)-min(first_event_timestamp)) %>% 
+  filter(session_length > 0)
+
+sessions %>% head()
+```
+
+Next, lets take a look at some correlation tests results to these two variables (*num_clicks* and *session_length*):
+
+```{r calc4}
+cor.test(sessions$sum_num_clicks, sessions$session_length, method = "pearson")
+cor.test(sessions$sum_num_clicks, sessions$session_length, method = "spearman")
+cor.test(sessions$sum_num_clicks, sessions$session_length, method = "kendall")
+```
+
+As we can see the three different methods have the same result: there is no correlation between the sum of clicks in a search session and the time the session lasts.
+
+## [Visualization](#vis4)
+
+We can confirm the correlation tests results graphically: there is no observable tendency on the data.
+
+```{r vis4, warning=FALSE}
+
+summary(sessions)
+
+sessions %>% 
+  ggplot(aes(x = session_length, y = sum_num_clicks)) +
+  geom_point(alpha = .3) +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(x = "Session Length",
+       y = "Number of Clicks",
+       title="Number of Clicks vs Session Length")
+```
 
 
